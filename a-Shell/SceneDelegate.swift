@@ -120,7 +120,7 @@ class SceneDelegate: UIViewController, UIWindowSceneDelegate, WKNavigationDelega
     var fontPicker = UIFontPickerViewController()
     var navigationType: WKNavigationType = .other
     var lastUsedPrompt = "$"
-
+    private var selectionFilePathForDelete: String? = nil
     // Create a document picker for directories.
     private let documentPicker =
     UIDocumentPickerViewController(documentTypes: [kUTTypeFolder as String],
@@ -2092,24 +2092,54 @@ class SceneDelegate: UIViewController, UIWindowSceneDelegate, WKNavigationDelega
     
     func preview(arguments: [String]?) -> Int32 {
         guard (arguments != nil) else { return -1 }
-        guard (arguments!.count >= 2) else { return -1 } // There must be at least one command
-        // copy arguments:
-        let path = arguments![1]
-        if (FileManager().fileExists(atPath: path)) {
-        let url = URL(fileURLWithPath: path)
-        let preview = UIDocumentInteractionController(url: url)
-        preview.delegate = self
-        DispatchQueue.main.async {
-            preview.presentPreview(animated: true)
-        }
-        return 0
-        } else {
-            // File not found.
-            if !path.hasPrefix("-") {
-                fputs("view: file " + path + "not found\n", thread_stderr)
+        
+        if arguments![0] == "selection" {
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent(UUID().uuidString)
+                .appendingPathExtension("txt")
+            
+            if (webView?.url?.path == Bundle.main.resourcePath! + "/hterm.html") {
+                let commandString = "window.term_.scrollPort_.selectAll();window.term_.copySelectionToClipboard();window.term_.io.onVTKeystroke((!window.term_.keyboard.applicationCursor) ? '\\x1b[D' : '\\x1bOD');"
+                webView?.evaluateJavaScript(commandString) { (result, error) in
+                    let string = UIPasteboard.general.string
+                    try? string?.write(to: url, atomically: true, encoding: .utf8)
+
+                    let path = url.path
+
+                    if (FileManager().fileExists(atPath: path)) {
+                        let preview = UIDocumentInteractionController(url: url)
+                        preview.name = "selection"
+                        preview.delegate = self
+                        self.selectionFilePathForDelete = path
+                        DispatchQueue.main.async {
+                            preview.presentPreview(animated: true)
+                        }
+                    }
+                }
+                return 0
+            } else {
+                return -1
             }
-            fputs("usage: view file\n", thread_stderr)
-            return -1
+        } else {
+            guard (arguments!.count >= 2) else { return -1 } // There must be at least one command
+            // copy arguments:
+            let path = arguments![1]
+            if (FileManager().fileExists(atPath: path)) {
+                let url = URL(fileURLWithPath: path)
+                let preview = UIDocumentInteractionController(url: url)
+                preview.delegate = self
+                DispatchQueue.main.async {
+                    preview.presentPreview(animated: true)
+                }
+                return 0
+            } else {
+                // File not found.
+                if !path.hasPrefix("-") {
+                    fputs("view: file " + path + "not found\n", thread_stderr)
+                }
+                fputs("usage: view file\n", thread_stderr)
+                return -1
+            }
         }
     }
     
@@ -2119,6 +2149,14 @@ class SceneDelegate: UIViewController, UIWindowSceneDelegate, WKNavigationDelega
             return self
         } else {
             return rootVC!
+        }
+    }
+    
+    func documentInteractionControllerDidEndPreview(_ controller: UIDocumentInteractionController) {
+        if selectionFilePathForDelete != nil {
+            try? FileManager.default.removeItem(atPath: selectionFilePathForDelete!)
+
+            selectionFilePathForDelete = nil
         }
     }
     

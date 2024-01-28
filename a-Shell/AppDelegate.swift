@@ -347,6 +347,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
             replaceCommand("newWindow", "clear", true)
         }
         replaceCommand("exit", "clear", true)
+        replaceCommand("selection", "preview_main", true)
         // for debugging TeX issues:
         // addCommandList(Bundle.main.path(forResource: "texCommandsDictionary", ofType: "plist"))
         // addCommandList(Bundle.main.path(forResource: "luatexCommandsDictionary", ofType: "plist"))
